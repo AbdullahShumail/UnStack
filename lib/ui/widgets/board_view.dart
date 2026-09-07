@@ -6,6 +6,7 @@ import '../../engine/board.dart';
 import '../../engine/direction.dart';
 import '../../state/game_controller.dart';
 import '../../theme/palette.dart';
+import 'arrow_glyph.dart';
 
 /// An arrow currently flying off the board.
 class _Flight {
@@ -226,7 +227,7 @@ class _BoardPainter extends CustomPainter {
   final double pulseT;
 
   /// Arrows are drawn at this fraction of a cell.
-  static const double _glyphScale = 0.66;
+  static const double _glyphScale = 0.60;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -401,21 +402,15 @@ class _BoardPainter extends CustomPainter {
     canvas.translate(center.dx, center.dy);
     canvas.rotate(dir.turns * 2 * math.pi);
 
-    final paint = Paint()
-      ..color = color.withValues(alpha: color.a * opacity)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = s * 0.115
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final path = Path()
-      ..moveTo(-s * 0.40, 0)
-      ..lineTo(s * 0.28, 0)
-      ..moveTo(s * 0.06, -s * 0.24)
-      ..lineTo(s * 0.40, 0)
-      ..lineTo(s * 0.06, s * 0.24);
-
-    canvas.drawPath(path, paint);
+    canvas.drawPath(
+      buildArrowPath(s),
+      Paint()
+        ..color = color.withValues(alpha: color.a * opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = arrowStroke(s)
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
     canvas.restore();
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/palette.dart';
+import 'arrow_glyph.dart';
 
 /// Health drawn as a row of arrows, matching the board's line-art.
 ///
@@ -63,21 +64,15 @@ class _ArrowGlyph extends CustomPainter {
     final s = size.shortestSide;
     canvas.translate(size.width / 2, size.height / 2);
 
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = s * 0.135
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final path = Path()
-      ..moveTo(-s * 0.38, 0)
-      ..lineTo(s * 0.26, 0)
-      ..moveTo(s * 0.04, -s * 0.24)
-      ..lineTo(s * 0.38, 0)
-      ..lineTo(s * 0.04, s * 0.24);
-
-    canvas.drawPath(path, paint);
+    canvas.drawPath(
+      buildArrowPath(s),
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = arrowStroke(s) * 1.2
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
   }
 
   @override

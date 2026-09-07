@@ -100,9 +100,20 @@ class Chapters {
   /// taller than it is wide, so a portrait screen is actually filled.
   static ({int rows, int cols}) gridFor(int arrows, int maxStack) {
     final cellsNeeded = arrows / maxStack / _occupancy;
-    final cols =
-        sqrt(cellsNeeded / _aspect).ceil().clamp(_minSide, _maxSide);
-    final rows = (cellsNeeded / cols).ceil().clamp(_minSide, _maxSide);
+
+    // Derive the shape from the aspect first, then grow it until it holds the
+    // arrows. Rounding the column count (rather than ceiling it) matters: a
+    // ceil here pushes small boards up a column and back into a square, which
+    // is what left dead bands above and below the board on a tall screen.
+    var cols = sqrt(cellsNeeded / _aspect).round().clamp(_minSide, _maxSide);
+    var rows = (cols * _aspect).round().clamp(_minSide, _maxSide);
+
+    while (cols * rows < cellsNeeded && rows < _maxSide) {
+      rows++;
+    }
+    while (cols * rows < cellsNeeded && cols < _maxSide) {
+      cols++;
+    }
     return (rows: rows, cols: cols);
   }
 
