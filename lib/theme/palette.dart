@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// Black ground, white line-art arrows.
 ///
@@ -75,8 +74,12 @@ class Palette {
 
   // ------------------------------------------------------------------ type
 
+  /// Bundled with the app, so the first launch renders correctly offline.
+  static const family = 'SpaceGrotesk';
+
   static TextStyle display(double size, {FontWeight weight = FontWeight.w700}) =>
-      GoogleFonts.spaceGrotesk(
+      TextStyle(
+        fontFamily: family,
         fontSize: size,
         fontWeight: weight,
         color: text,
@@ -89,7 +92,8 @@ class Palette {
     Color color = text,
     double spacing = 0,
   }) =>
-      GoogleFonts.spaceGrotesk(
+      TextStyle(
+        fontFamily: family,
         fontSize: size,
         fontWeight: weight,
         color: color,
@@ -105,8 +109,9 @@ class Palette {
           primary: Color(0xFFFFFFFF),
           onPrimary: Color(0xFF000000),
         ),
-        textTheme: GoogleFonts.spaceGroteskTextTheme(
-          ThemeData(brightness: Brightness.dark).textTheme,
-        ),
+        fontFamily: family,
+        textTheme: ThemeData(brightness: Brightness.dark)
+            .textTheme
+            .apply(fontFamily: family),
       );
 }
