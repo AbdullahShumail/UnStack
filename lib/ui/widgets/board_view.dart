@@ -13,11 +13,18 @@ class _Flight {
   _Flight({
     required this.path,
     required this.dir,
+    required this.seed,
     required this.controller,
   });
 
   final List<Cell> path;
   final Direction dir;
+
+  /// Carried over from the cell it left, so the arrow keeps the same route it
+  /// had while sitting on the board and visibly unwinds rather than swapping
+  /// for a different shape.
+  final int seed;
+
   final AnimationController controller;
 }
 
@@ -99,6 +106,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         final flight = _Flight(
           path: [from, ...path],
           dir: dir,
+          seed: routeSeed(from.row, from.col, dir.index),
           controller: AnimationController(
             vsync: this,
             duration: Duration(milliseconds: math.max(230, 52 * path.length)),
@@ -227,7 +235,7 @@ class _BoardPainter extends CustomPainter {
   final double pulseT;
 
   /// Arrows are drawn at this fraction of a cell.
-  static const double _glyphScale = 0.60;
+  static const double _glyphScale = 0.74;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -249,6 +257,7 @@ class _BoardPainter extends CustomPainter {
   void _paintCell(Canvas canvas, int row, int col, int height) {
     final dir = board.topAt(row, col)!;
     final s = geometry.cell * _glyphScale;
+    final seed = routeSeed(row, col, dir.index);
     var center = geometry.centerOf(row, col);
 
     // A blocked arrow lunges at the wall and springs back.
@@ -275,10 +284,11 @@ class _BoardPainter extends CustomPainter {
         dir,
         Palette.arrowGhost,
         1 - (i - 1) * 0.25,
+        seed: seed,
       );
     }
 
-    _paintArrow(canvas, center, s, dir, tint, 1);
+    _paintArrow(canvas, center, s, dir, tint, 1, seed: seed);
 
     if (height > 1) _paintDepth(canvas, center, s, height);
   }
@@ -288,6 +298,10 @@ class _BoardPainter extends CustomPainter {
     final t = Curves.easeInCubic.transform(raw);
     final path = flight.path;
     final s = geometry.cell * _glyphScale;
+
+    // The coil releases early in the flight, so the arrow is already running
+    // straight by the time it clears the board.
+    final unwind = Curves.easeOutCubic.transform(raw.clamp(0.0, 1.0));
 
     // A short trail sells the speed without a particle system.
     for (var i = 2; i >= 0; i--) {
@@ -302,6 +316,8 @@ class _BoardPainter extends CustomPainter {
         flight.dir,
         Palette.arrow,
         fade,
+        seed: flight.seed,
+        straightness: unwind,
       );
     }
   }
@@ -366,13 +382,15 @@ class _BoardPainter extends CustomPainter {
       );
     }
 
+    final hintDir = board.topAt(cell.row, cell.col) ?? Direction.right;
     _paintArrow(
       canvas,
       center,
       s * scale,
-      board.topAt(cell.row, cell.col) ?? Direction.right,
+      hintDir,
       Palette.hint,
       1,
+      seed: routeSeed(cell.row, cell.col, hintDir.index),
     );
 
     // Once the reveal finishes, a slow ring keeps the arrow findable.
@@ -389,21 +407,30 @@ class _BoardPainter extends CustomPainter {
   }
 
   /// A thin stroked arrow, authored pointing right and rotated to [dir].
+  ///
+  /// [seed] picks the arrow's route; [straightness] unwinds it.
   void _paintArrow(
     Canvas canvas,
     Offset center,
     double s,
     Direction dir,
     Color color,
-    double opacity,
-  ) {
+    double opacity, {
+    required int seed,
+    double straightness = 0,
+  }) {
     if (opacity <= 0.01) return;
     canvas.save();
     canvas.translate(center.dx, center.dy);
     canvas.rotate(dir.turns * 2 * math.pi);
 
     canvas.drawPath(
-      buildArrowPath(s),
+      buildRoutedArrowPath(
+        s: s,
+        seed: seed,
+        straightness: straightness,
+        turns: 2 + (seed % 3),
+      ),
       Paint()
         ..color = color.withValues(alpha: color.a * opacity)
         ..style = PaintingStyle.stroke
