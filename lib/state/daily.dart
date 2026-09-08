@@ -11,9 +11,10 @@ class Daily {
   const Daily._();
 
   static const rows = 6;
-  static const cols = 6;
-  static const maxStack = 3;
-  static const arrows = 28;
+  static const cols = 4;
+  static const minBody = 2;
+  static const maxBody = 4;
+  static const arrows = 12;
 
   /// Middling-hard: beatable in one sitting by a regular, still a real puzzle.
   static const hardness = 0.7;
@@ -36,7 +37,8 @@ class Daily {
       rows: rows,
       cols: cols,
       targetArrows: arrows,
-      maxStack: maxStack,
+      minBody: minBody,
+      maxBody: maxBody,
       hardness: hardness,
       seed: 0x5BF03635 ^ (ordinal * 2246822519),
     );

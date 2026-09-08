@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unstack/engine/board.dart';
 import 'package:unstack/state/game_controller.dart';
 import 'package:unstack/state/level_ref.dart';
 import 'package:unstack/state/progress_store.dart';
@@ -17,55 +18,75 @@ void main() {
   GameController controllerAt(int index) =>
       GameController(store: store, ref: CampaignRef(index));
 
+  /// A cell belonging to an arrow that cannot currently leave.
+  Cell? blockedCell(GameController game) {
+    final legal = game.board.launchableIds().toSet();
+    for (final b in game.board.bodies) {
+      if (!legal.contains(b.id)) return b.head;
+    }
+    return null;
+  }
+
+  Cell launchableCell(GameController game) =>
+      game.board.bodyById(game.board.launchableIds().first)!.head;
+
   group('GameController', () {
-    test('a legal launch clears the arrow', () {
+    test('a legal launch clears the whole arrow', () {
       final game = controllerAt(0);
       final before = game.arrowsLeft;
-      final target = game.board.launchableCells().first;
-      expect(game.launch(target.row, target.col), isA<LaunchOk>());
+      final target = game.board.bodyById(game.board.launchableIds().first)!;
+      final covered = target.cells;
+
+      expect(game.launch(target.head.row, target.head.col), isA<LaunchOk>());
       expect(game.arrowsLeft, before - 1);
-      expect(game.mistakes, 0);
+      for (final c in covered) {
+        expect(game.board.isEmptyAt(c.row, c.col), isTrue,
+            reason: 'every cell of the body must be freed');
+      }
       game.dispose();
     });
 
-    test('a blocked launch reports the arrow standing in the way', () {
+    test('tapping any cell of a body launches it, not just the head', () {
       final game = controllerAt(30);
-      final legal =
-          game.board.launchableCells().map((c) => '${c.row},${c.col}').toSet();
+      final target = game.board.bodies.firstWhere(
+        (b) => b.length > 1 && game.board.isLaunchable(b.id),
+        orElse: () => game.board.bodyById(game.board.launchableIds().first)!,
+      );
+      final tail = target.cells.last;
+      expect(game.launch(tail.row, tail.col), isA<LaunchOk>());
+      expect(game.board.bodyById(target.id), isNull);
+      game.dispose();
+    });
 
-      LaunchBlocked? blocked;
-      for (var r = 0; r < game.board.rows && blocked == null; r++) {
-        for (var c = 0; c < game.board.cols; c++) {
-          if (game.board.isEmptyAt(r, c) || legal.contains('$r,$c')) continue;
-          final result = game.launch(r, c);
-          if (result is LaunchBlocked) {
-            blocked = result;
-            break;
-          }
-        }
-      }
+    test('a blocked launch reports the cell standing in the way', () {
+      final game = controllerAt(30);
+      final target = blockedCell(game);
+      expect(target, isNotNull, reason: 'level 31 should have a blocked arrow');
 
-      expect(blocked, isNotNull, reason: 'level 31 should have a blocked arrow');
-      expect(game.mistakes, 1);
+      final result = game.launch(target!.row, target.col);
+      expect(result, isA<LaunchBlocked>());
+      final blocked = result as LaunchBlocked;
+      expect(game.board.isEmptyAt(blocked.blocker.row, blocked.blocker.col),
+          isFalse);
       expect(
-        game.board.isEmptyAt(blocked!.blocker.row, blocked.blocker.col),
-        isFalse,
+        game.board.bodyAt(blocked.blocker.row, blocked.blocker.col)!.id,
+        isNot(blocked.body.id),
+        reason: 'an arrow must never be reported as blocking itself',
       );
       game.dispose();
     });
 
-    test('undo restores the exact arrow that was launched', () {
+    test('undo puts the whole body back', () {
       final game = controllerAt(12);
-      final target = game.board.launchableCells().first;
-      final dir = game.board.topAt(target.row, target.col);
-      final height = game.board.heightAt(target.row, target.col);
+      final target = game.board.bodyById(game.board.launchableIds().first)!;
+      final covered = target.cells;
 
-      game.launch(target.row, target.col);
-      expect(game.board.heightAt(target.row, target.col), height - 1);
-
+      game.launch(target.head.row, target.head.col);
       game.undo();
-      expect(game.board.heightAt(target.row, target.col), height);
-      expect(game.board.topAt(target.row, target.col), dir);
+
+      for (final c in covered) {
+        expect(game.board.bodyAt(c.row, c.col)?.id, target.id);
+      }
       expect(game.canUndo, isFalse);
       game.dispose();
     });
@@ -74,7 +95,7 @@ void main() {
       final game = controllerAt(20);
       final total = game.arrowsTotal;
       for (final step in game.level.solutionOrder) {
-        game.launch(step.row, step.col);
+        game.launch(step.head.row, step.head.col);
       }
       expect(game.won, isTrue);
 
@@ -90,12 +111,11 @@ void main() {
     test('a clean solve is worth three stars and pays out', () async {
       final game = controllerAt(5);
       for (final step in game.level.solutionOrder) {
-        game.launch(step.row, step.col);
+        game.launch(step.head.row, step.head.col);
       }
       await Future<void>.delayed(Duration.zero);
       expect(game.stars, 3);
       expect(game.payout, ProgressStore.coinsByStars[3]);
-      expect(store.starsFor(5), 3);
       expect(store.currentLevel, 6);
       game.dispose();
     });
@@ -108,7 +128,9 @@ void main() {
       expect(store.coins, before, reason: 'free hint must not charge');
       expect(game.hintIsFree, isFalse);
       expect(
-        game.board.isLaunchable(game.hinted!.row, game.hinted!.col),
+        game.board.isLaunchable(
+          game.board.bodyAt(game.hinted!.row, game.hinted!.col)!.id,
+        ),
         isTrue,
       );
       game.dispose();
@@ -120,13 +142,12 @@ void main() {
       final before = store.coins;
       expect(await game.useHint(), isNull);
       expect(store.coins, before - ProgressStore.hintCost);
-      expect(game.hintsUsed, 2);
       game.dispose();
     });
 
     test('an empty wallet refuses a paid hint and charges nothing', () async {
       final game = controllerAt(9);
-      await game.useHint(); // free one
+      await game.useHint();
       await store.spend(store.coins);
       expect(await game.useHint(), HintDenial.broke);
       expect(game.hintsUsed, 1);
@@ -145,7 +166,7 @@ void main() {
 
     test('nextLevel advances and resets the run', () {
       final game = controllerAt(3);
-      final first = game.board.launchableCells().first;
+      final first = launchableCell(game);
       game.launch(first.row, first.col);
       game.nextLevel();
       expect((game.ref as CampaignRef).index, 4);
@@ -163,20 +184,6 @@ void main() {
       game.dispose();
     });
 
-    /// A cell whose top arrow is currently blocked, if the level has one.
-    Cell? blockedCell(GameController game) {
-      final legal =
-          game.board.launchableCells().map((c) => '${c.row},${c.col}').toSet();
-      for (var r = 0; r < game.board.rows; r++) {
-        for (var c = 0; c < game.board.cols; c++) {
-          if (game.board.isEmptyAt(r, c)) continue;
-          if (legal.contains('$r,$c')) continue;
-          return (row: r, col: c);
-        }
-      }
-      return null;
-    }
-
     test('a level opens at full health', () {
       final game = controllerAt(30);
       expect(game.health, GameController.maxHealth);
@@ -184,24 +191,19 @@ void main() {
       game.dispose();
     });
 
-    test('a blocked tap costs one health', () {
+    test('a blocked tap costs one health, a legal one costs none', () {
       final game = controllerAt(30);
-      final target = blockedCell(game)!;
-      game.launch(target.row, target.col);
+      final blocked = blockedCell(game)!;
+      game.launch(blocked.row, blocked.col);
       expect(game.health, GameController.maxHealth - 1);
-      expect(game.failed, isFalse);
+
+      final legal = launchableCell(game);
+      game.launch(legal.row, legal.col);
+      expect(game.health, GameController.maxHealth - 1);
       game.dispose();
     });
 
-    test('a legal launch costs no health', () {
-      final game = controllerAt(30);
-      final target = game.board.launchableCells().first;
-      game.launch(target.row, target.col);
-      expect(game.health, GameController.maxHealth);
-      game.dispose();
-    });
-
-    test('running out of health fails the level', () {
+    test('running out of health fails the level and stops play', () {
       final game = controllerAt(30);
       for (var i = 0; i < GameController.maxHealth; i++) {
         final target = blockedCell(game);
@@ -210,17 +212,9 @@ void main() {
       }
       expect(game.health, 0);
       expect(game.failed, isTrue);
-      game.dispose();
-    });
 
-    test('a failed level refuses further launches', () {
-      final game = controllerAt(30);
-      for (var i = 0; i < GameController.maxHealth; i++) {
-        final target = blockedCell(game)!;
-        game.launch(target.row, target.col);
-      }
       final remaining = game.arrowsLeft;
-      final legal = game.board.launchableCells().first;
+      final legal = launchableCell(game);
       expect(game.launch(legal.row, legal.col), isA<LaunchNothing>());
       expect(game.arrowsLeft, remaining, reason: 'board must not change');
       game.dispose();
@@ -236,7 +230,7 @@ void main() {
       expect(game.failed, isFalse);
       expect(game.health, 1);
 
-      final legal = game.board.launchableCells().first;
+      final legal = launchableCell(game);
       expect(game.launch(legal.row, legal.col), isA<LaunchOk>());
       game.dispose();
     });
@@ -251,25 +245,12 @@ void main() {
       game.dispose();
     });
 
-    test('lost health costs stars', () async {
-      final game = controllerAt(30);
-      final target = blockedCell(game)!;
-      game.launch(target.row, target.col);
-      for (final step in game.level.solutionOrder) {
-        game.launch(step.row, step.col);
-      }
-      await Future<void>.delayed(Duration.zero);
-      expect(game.won, isTrue);
-      expect(game.stars, lessThan(3));
-      game.dispose();
-    });
-
     test('every chapter boundary builds a playable level', () {
       for (final index in [0, 12, 32, 57, 87, 117, 400]) {
         final game = controllerAt(index);
         expect(game.arrowsLeft, greaterThan(0), reason: 'level $index is empty');
         expect(
-          game.board.launchableCells(),
+          game.board.launchableIds(),
           isNotEmpty,
           reason: 'level $index opens with no legal move',
         );

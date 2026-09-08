@@ -1,21 +1,11 @@
 import 'board.dart';
-import 'direction.dart';
-
-/// A single arrow placed on the board.
-class Placement {
-  const Placement({required this.row, required this.col, required this.dir});
-
-  final int row;
-  final int col;
-  final Direction dir;
-}
 
 /// How demanding a level is, measured by how much freedom the player has.
 ///
-/// Because launching an arrow only ever frees space, a generated level can
-/// never become unsolvable, and every solution takes exactly one move per
-/// arrow. Difficulty therefore comes entirely from how *few* legal moves are
-/// available at each step, not from move count or dead ends.
+/// Removing an arrow only ever frees cells, so a generated level can never
+/// become unsolvable and every solution takes exactly one move per arrow.
+/// Difficulty therefore comes entirely from how *few* arrows are launchable at
+/// each step, not from move count or dead ends.
 class DifficultyProfile {
   const DifficultyProfile({
     required this.arrowCount,
@@ -26,9 +16,8 @@ class DifficultyProfile {
   });
 
   /// The tail of a solve is trivial by construction — the last arrow always
-  /// has exactly one legal move — so those steps are excluded from the
-  /// difficulty measures below.
-  static const int trivialTail = 4;
+  /// has a clear lane — so those steps are excluded from the measures below.
+  static const int trivialTail = 3;
 
   /// Where the open ratio realistically lands, measured across shipped board
   /// configs in tool/curve.dart. Used to normalise [score].
@@ -43,8 +32,8 @@ class DifficultyProfile {
   final double avgBranching;
 
   /// Mean fraction of the *remaining* arrows that were launchable. This is the
-  /// quantity the player actually experiences when scanning the board, and
-  /// unlike a raw count it is comparable across board sizes.
+  /// quantity the player experiences when scanning the board, and unlike a raw
+  /// count it is comparable across board sizes.
   final double avgOpenRatio;
 
   /// Non-trivial steps offering at most two legal moves.
@@ -75,7 +64,7 @@ class Level {
   const Level({
     required this.rows,
     required this.cols,
-    required this.placements,
+    required this.bodies,
     required this.profile,
     required this.seed,
   });
@@ -85,19 +74,22 @@ class Level {
   final int seed;
 
   /// Arrows in the order the generator laid them down.
-  final List<Placement> placements;
+  final List<ArrowBody> bodies;
 
   final DifficultyProfile profile;
 
   /// A known-good solve order. Reversing the placement order works because an
-  /// arrow was only ever placed while its own path was clear.
-  List<Placement> get solutionOrder =>
-      placements.reversed.toList(growable: false);
+  /// arrow was only ever placed while its own lane out was clear.
+  List<ArrowBody> get solutionOrder => bodies.reversed.toList(growable: false);
+
+  /// Total cells covered, which is what the board actually looks full of.
+  int get coveredCells =>
+      bodies.fold(0, (sum, b) => sum + b.length);
 
   Board toBoard() {
     final board = Board(rows, cols);
-    for (final p in placements) {
-      board.push(p.row, p.col, p.dir);
+    for (final b in bodies) {
+      board.place(b);
     }
     return board;
   }
