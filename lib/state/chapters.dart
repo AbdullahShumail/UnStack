@@ -42,12 +42,13 @@ class Chapters {
 
   /// Share of cells holding an arrow. Below this the board feels sparse and
   /// trivial; above it the generator starts running out of legal placements.
-  static const double _occupancy = 0.55;
+  static const double _occupancy = 0.66;
 
   /// Board sides we are willing to draw. The upper bound keeps arrows legible
   /// on a phone once they shrink to fit.
   static const int _minSide = 3;
-  static const int _maxSide = 9;
+  static const int _maxCols = 6;
+  static const int _maxRows = 10;
 
   /// Rows per column. A square board on a tall phone is width-constrained and
   /// leaves big dead bands above and below, so boards are grown taller than
@@ -57,38 +58,44 @@ class Chapters {
   static const List<ChapterSpec> all = [
     ChapterSpec(
       name: 'First Steps',
-      startArrows: 5, endArrows: 11, maxStack: 1,
-      startHardness: 0.0, endHardness: 0.45,
-      levelCount: 12,
+      startArrows: 6, endArrows: 14, maxStack: 1,
+      startHardness: 0.05, endHardness: 0.55,
+      levelCount: 10,
     ),
     ChapterSpec(
       name: 'Stacking Up',
-      startArrows: 12, endArrows: 20, maxStack: 2,
-      startHardness: 0.2, endHardness: 0.6,
+      startArrows: 16, endArrows: 28, maxStack: 2,
+      startHardness: 0.35, endHardness: 0.7,
       levelCount: 20,
     ),
     ChapterSpec(
       name: 'Deep Cuts',
-      startArrows: 20, endArrows: 30, maxStack: 3,
-      startHardness: 0.35, endHardness: 0.75,
+      startArrows: 30, endArrows: 46, maxStack: 3,
+      startHardness: 0.5, endHardness: 0.82,
       levelCount: 25,
     ),
     ChapterSpec(
       name: 'Gridlock',
-      startArrows: 28, endArrows: 42, maxStack: 3,
-      startHardness: 0.45, endHardness: 0.85,
+      startArrows: 46, endArrows: 66, maxStack: 3,
+      startHardness: 0.62, endHardness: 0.9,
       levelCount: 30,
     ),
     ChapterSpec(
       name: 'Tower Block',
-      startArrows: 38, endArrows: 55, maxStack: 4,
-      startHardness: 0.55, endHardness: 0.9,
-      levelCount: 30,
+      startArrows: 62, endArrows: 92, maxStack: 4,
+      startHardness: 0.72, endHardness: 0.95,
+      levelCount: 35,
+    ),
+    ChapterSpec(
+      name: 'The Vault',
+      startArrows: 88, endArrows: 130, maxStack: 5,
+      startHardness: 0.82, endHardness: 1.0,
+      levelCount: 40,
     ),
     ChapterSpec(
       name: 'Endless',
-      startArrows: 48, endArrows: 72, maxStack: 4,
-      startHardness: 0.7, endHardness: 1.0,
+      startArrows: 120, endArrows: 170, maxStack: 5,
+      startHardness: 0.9, endHardness: 1.0,
       levelCount: 1 << 30,
     ),
   ];
@@ -105,13 +112,13 @@ class Chapters {
     // arrows. Rounding the column count (rather than ceiling it) matters: a
     // ceil here pushes small boards up a column and back into a square, which
     // is what left dead bands above and below the board on a tall screen.
-    var cols = sqrt(cellsNeeded / _aspect).round().clamp(_minSide, _maxSide);
-    var rows = (cols * _aspect).round().clamp(_minSide, _maxSide);
+    var cols = sqrt(cellsNeeded / _aspect).round().clamp(_minSide, _maxCols);
+    var rows = (cols * _aspect).round().clamp(_minSide, _maxRows);
 
-    while (cols * rows < cellsNeeded && rows < _maxSide) {
+    while (cols * rows < cellsNeeded && rows < _maxRows) {
       rows++;
     }
-    while (cols * rows < cellsNeeded && cols < _maxSide) {
+    while (cols * rows < cellsNeeded && cols < _maxCols) {
       cols++;
     }
     return (rows: rows, cols: cols);
