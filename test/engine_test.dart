@@ -6,107 +6,85 @@ import 'package:unstack/engine/direction.dart';
 import 'package:unstack/engine/generator.dart';
 
 void main() {
-  ArrowBody body(int id, Direction dir, List<Cell> cells) =>
-      ArrowBody(id: id, dir: dir, cells: cells);
-
   group('Board rules', () {
     test('an arrow with an empty lane can launch', () {
-      final b = Board(3, 3)
-        ..place(body(0, Direction.right, [(row: 1, col: 0)]));
-      expect(b.isLaunchable(0), isTrue);
+      final board = Board(3, 3)..push(1, 1, Direction.right);
+      expect(board.isLaunchable(1, 1), isTrue);
     });
 
-    test('a body blocks a lane, not just a head', () {
-      // Arrow 1's tail lies across arrow 0's lane; its head is elsewhere.
-      final b = Board(3, 4)
-        ..place(body(0, Direction.right, [(row: 1, col: 0)]))
-        ..place(body(1, Direction.up, [
-          (row: 0, col: 2),
-          (row: 1, col: 2),
-        ]));
-      expect(
-        b.bodyAt(1, 2)!.id,
-        1,
-        reason: 'the blocking cell is a tail cell, not a head',
-      );
-      expect(b.isLaunchable(0), isFalse);
-      expect(b.isLaunchable(1), isTrue);
+    test('an arrow is blocked by anything in its lane', () {
+      final board = Board(3, 3)
+        ..push(1, 1, Direction.right)
+        ..push(1, 2, Direction.up);
+      expect(board.isLaunchable(1, 1), isFalse);
+      // The blocker itself is on the edge facing out, so it can still go.
+      expect(board.isLaunchable(1, 2), isTrue);
     });
 
-    test('an arrow is not blocked by its own body', () {
-      final b = Board(3, 4)
-        ..place(body(0, Direction.right, [
-          (row: 1, col: 2),
-          (row: 1, col: 1),
-          (row: 1, col: 0),
-        ]));
-      expect(b.isLaunchable(0), isTrue);
+    test('a stack never blocks its own top arrow', () {
+      final board = Board(3, 3)
+        ..push(1, 1, Direction.up)
+        ..push(1, 1, Direction.right);
+      expect(board.heightAt(1, 1), 2);
+      expect(board.topAt(1, 1), Direction.right);
+      expect(board.isLaunchable(1, 1), isTrue);
     });
 
-    test('removing an arrow frees every cell it covered', () {
-      final cells = [(row: 1, col: 2), (row: 1, col: 1), (row: 0, col: 1)];
-      final b = Board(3, 3)..place(body(0, Direction.right, cells));
-      for (final c in cells) {
-        expect(b.isEmptyAt(c.row, c.col), isFalse);
-      }
-      b.remove(0);
-      for (final c in cells) {
-        expect(b.isEmptyAt(c.row, c.col), isTrue);
-      }
-      expect(b.isCleared, isTrue);
-    });
-
-    test('canPlace rejects an overlap', () {
-      final b = Board(3, 3)
-        ..place(body(0, Direction.right, [(row: 1, col: 1)]));
-      expect(
-        b.canPlace(body(1, Direction.up, [(row: 1, col: 1)])),
-        isFalse,
-      );
-      expect(
-        b.canPlace(body(1, Direction.up, [(row: 0, col: 0)])),
-        isTrue,
-      );
+    test('only the top of a stack is considered', () {
+      // Top faces right into a blocker; the buried arrow faces a clear lane
+      // but must not be launchable.
+      final board = Board(3, 3)
+        ..push(1, 1, Direction.up)
+        ..push(1, 1, Direction.right)
+        ..push(1, 2, Direction.down);
+      expect(board.isLaunchable(1, 1), isFalse);
+      board.pop(1, 1);
+      expect(board.isLaunchable(1, 1), isTrue, reason: 'buried arrow now on top');
     });
 
     test('clone is a deep copy', () {
-      final b = Board(2, 2)..place(body(0, Direction.up, [(row: 0, col: 0)]));
-      final copy = b.clone()..remove(0);
-      expect(b.arrowCount, 1);
-      expect(copy.arrowCount, 0);
+      final board = Board(2, 2)..push(0, 0, Direction.up);
+      final copy = board.clone()..push(0, 0, Direction.down);
+      expect(board.heightAt(0, 0), 1);
+      expect(copy.heightAt(0, 0), 2);
     });
   });
 
   group('Generator', () {
     const gen = LevelGenerator();
 
+    // Configurations spanning the range we expect to ship.
     final configs = [
-      (rows: 5, cols: 3, arrows: 5, minBody: 1, maxBody: 2),
-      (rows: 6, cols: 4, arrows: 8, minBody: 2, maxBody: 3),
-      (rows: 7, cols: 5, arrows: 12, minBody: 2, maxBody: 4),
-      (rows: 8, cols: 5, arrows: 16, minBody: 3, maxBody: 5),
+      (rows: 4, cols: 4, arrows: 10, stack: 1),
+      (rows: 5, cols: 5, arrows: 18, stack: 2),
+      (rows: 6, cols: 6, arrows: 30, stack: 3),
+      (rows: 7, cols: 5, arrows: 34, stack: 3),
     ];
 
     test('the canonical solution is legal at every step', () {
       for (final cfg in configs) {
-        for (var seed = 0; seed < 30; seed++) {
+        for (var seed = 0; seed < 40; seed++) {
           final level = gen.generate(
             rows: cfg.rows,
             cols: cfg.cols,
             targetArrows: cfg.arrows,
-            minBody: cfg.minBody,
-            maxBody: cfg.maxBody,
-            hardness: seed / 30,
+            maxStack: cfg.stack,
+            hardness: seed / 40,
             seed: seed,
           );
           final board = level.toBoard();
           for (final step in level.solutionOrder) {
             expect(
-              board.isLaunchable(step.id),
-              isTrue,
-              reason: 'seed $seed arrow ${step.id} must have a clear lane',
+              board.topAt(step.row, step.col),
+              step.dir,
+              reason: 'solution step must address the visible arrow',
             );
-            board.remove(step.id);
+            expect(
+              board.isLaunchable(step.row, step.col),
+              isTrue,
+              reason: 'seed $seed step (${step.row},${step.col}) must be legal',
+            );
+            board.pop(step.row, step.col);
           }
           expect(board.isCleared, isTrue);
         }
@@ -114,32 +92,32 @@ void main() {
     });
 
     test('random legal play always clears the board', () {
-      // The strong claim: removing an arrow frees every cell it covered, so
-      // lanes only ever open up and no sequence of legal moves can strand the
-      // player. Play at random and the board must always empty out.
+      // The strong claim: because launching only ever frees space, no sequence
+      // of legal moves can strand the player. Play greedily at random and the
+      // board must always empty out.
       final rng = Random(1234);
       for (final cfg in configs) {
-        for (var seed = 0; seed < 25; seed++) {
+        for (var seed = 0; seed < 30; seed++) {
           final level = gen.generate(
             rows: cfg.rows,
             cols: cfg.cols,
             targetArrows: cfg.arrows,
-            minBody: cfg.minBody,
-            maxBody: cfg.maxBody,
+            maxStack: cfg.stack,
             hardness: rng.nextDouble(),
             seed: seed + 500,
           );
           final board = level.toBoard();
           var moves = 0;
           while (!board.isCleared) {
-            final options = board.launchableIds();
+            final options = board.launchableCells();
             expect(
               options,
               isNotEmpty,
               reason: 'stuck with ${board.arrowCount} arrows left '
                   '(seed $seed, ${cfg.rows}x${cfg.cols})',
             );
-            board.remove(options[rng.nextInt(options.length)]);
+            final pick = options[rng.nextInt(options.length)];
+            board.pop(pick.row, pick.col);
             moves++;
           }
           expect(moves, level.profile.arrowCount);
@@ -147,62 +125,14 @@ void main() {
       }
     });
 
-    test('bodies never overlap', () {
-      for (var seed = 0; seed < 40; seed++) {
-        final level = gen.generate(
-          rows: 7, cols: 5, targetArrows: 12,
-          minBody: 2, maxBody: 4, hardness: 0.6, seed: seed,
-        );
-        final seen = <String>{};
-        for (final b in level.bodies) {
-          for (final c in b.cells) {
-            expect(
-              seen.add('${c.row},${c.col}'),
-              isTrue,
-              reason: 'cell ${c.row},${c.col} covered twice on seed $seed',
-            );
-          }
-        }
-      }
-    });
-
-    test('a body never lies in its own lane', () {
-      for (var seed = 0; seed < 40; seed++) {
-        final level = gen.generate(
-          rows: 7, cols: 5, targetArrows: 12,
-          minBody: 2, maxBody: 4, hardness: 0.6, seed: seed,
-        );
-        final board = Board(level.rows, level.cols);
-        for (final b in level.bodies) {
-          final lane = board.exitPath(b.head, b.dir).map(
-                (c) => '${c.row},${c.col}',
-              );
-          for (final c in b.cells) {
-            expect(
-              lane.contains('${c.row},${c.col}'),
-              isFalse,
-              reason: 'arrow ${b.id} blocks itself on seed $seed',
-            );
-          }
-        }
-      }
-    });
-
-    test('bodies respect the requested length range', () {
-      final level = gen.generate(
-        rows: 8, cols: 5, targetArrows: 14,
-        minBody: 3, maxBody: 5, hardness: 0.5, seed: 21,
-      );
-      for (final b in level.bodies) {
-        expect(b.length, greaterThanOrEqualTo(3));
-        expect(b.length, lessThanOrEqualTo(5));
-      }
-    });
-
     test('every solution costs exactly one move per arrow', () {
       final level = gen.generate(
-        rows: 7, cols: 5, targetArrows: 12,
-        minBody: 2, maxBody: 4, hardness: 0.6, seed: 99,
+        rows: 6,
+        cols: 6,
+        targetArrows: 28,
+        maxStack: 3,
+        hardness: 0.6,
+        seed: 99,
       );
       expect(level.solutionOrder.length, level.toBoard().arrowCount);
     });
@@ -210,13 +140,16 @@ void main() {
     test('higher hardness yields more constrained boards', () {
       double meanScore(double hardness) {
         var total = 0.0;
-        const trials = 25;
+        const trials = 30;
         for (var seed = 0; seed < trials; seed++) {
           total += gen
               .generateTuned(
-                rows: 7, cols: 5, targetArrows: 12,
-                minBody: 2, maxBody: 4,
-                hardness: hardness, seed: seed * 31 + 7,
+                rows: 6,
+                cols: 6,
+                targetArrows: 28,
+                maxStack: 3,
+                hardness: hardness,
+                seed: seed * 31 + 7,
               )
               .profile
               .score;
@@ -224,33 +157,39 @@ void main() {
         return total / trials;
       }
 
-      final easy = meanScore(0.1);
-      final hard = meanScore(0.95);
+      final easy = meanScore(0.15);
+      final hard = meanScore(0.9);
       expect(
         hard,
         greaterThan(easy),
-        reason: 'hardness must move difficulty (easy=$easy hard=$hard)',
+        reason: 'hardness knob must actually move difficulty (easy=$easy hard=$hard)',
       );
     });
 
+    test('generateTuned fills the board it was asked for', () {
+      final level = gen.generateTuned(
+        rows: 6,
+        cols: 6,
+        targetArrows: 26,
+        maxStack: 3,
+        hardness: 0.5,
+        seed: 4242,
+      );
+      // Saturation can cost a few arrows, but not many.
+      expect(level.profile.arrowCount, greaterThanOrEqualTo(22));
+    });
+
     test('the same seed reproduces the same level', () {
-      Level0 build() => Level0(gen.generate(
-            rows: 7, cols: 5, targetArrows: 12,
-            minBody: 2, maxBody: 4, hardness: 0.5, seed: 77,
-          ).bodies);
-      final a = build();
-      final b = build();
-      expect(a.signature, b.signature);
+      final a = gen.generate(
+          rows: 5, cols: 5, targetArrows: 18, maxStack: 2, hardness: 0.5, seed: 77);
+      final b = gen.generate(
+          rows: 5, cols: 5, targetArrows: 18, maxStack: 2, hardness: 0.5, seed: 77);
+      expect(a.placements.length, b.placements.length);
+      for (var i = 0; i < a.placements.length; i++) {
+        expect(a.placements[i].row, b.placements[i].row);
+        expect(a.placements[i].col, b.placements[i].col);
+        expect(a.placements[i].dir, b.placements[i].dir);
+      }
     });
   });
-}
-
-/// Small helper for comparing two generated levels cell for cell.
-class Level0 {
-  Level0(this.bodies);
-  final List<ArrowBody> bodies;
-  String get signature => bodies
-      .map((b) =>
-          '${b.dir.index}:${b.cells.map((c) => '${c.row},${c.col}').join('>')}')
-      .join('|');
 }

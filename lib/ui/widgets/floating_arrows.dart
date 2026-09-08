@@ -15,7 +15,6 @@ class _Drifter {
     required this.phase,
     required this.speed,
     required this.dir,
-    required this.seed,
   });
 
   /// Position as a fraction of the hero box.
@@ -29,9 +28,6 @@ class _Drifter {
   final double phase;
   final double speed;
   final Direction dir;
-
-  /// Fixes this arrow's route so it keeps one shape while it drifts.
-  final int seed;
 }
 
 /// A slow, three-dimensional drift of arrows sitting under the wordmark.
@@ -48,13 +44,13 @@ class FloatingArrows extends StatefulWidget {
   static const double _marginY = 0.16;
 
   static const List<_Drifter> _field = [
-    _Drifter(x: 0.26, y: 0.30, depth: 0.05, phase: 0.0, speed: 1.00, dir: Direction.right, seed: 17),
-    _Drifter(x: 0.76, y: 0.24, depth: 0.30, phase: 1.9, speed: 0.82, dir: Direction.up, seed: 4211),
-    _Drifter(x: 0.52, y: 0.60, depth: 0.00, phase: 3.4, speed: 1.15, dir: Direction.left, seed: 909),
-    _Drifter(x: 0.30, y: 0.76, depth: 0.55, phase: 0.9, speed: 0.70, dir: Direction.down, seed: 65),
-    _Drifter(x: 0.78, y: 0.70, depth: 0.72, phase: 2.6, speed: 0.62, dir: Direction.right, seed: 31337),
-    _Drifter(x: 0.60, y: 0.13, depth: 0.85, phase: 4.7, speed: 0.55, dir: Direction.left, seed: 2718),
-    _Drifter(x: 0.24, y: 0.52, depth: 0.90, phase: 5.5, speed: 0.48, dir: Direction.up, seed: 1414),
+    _Drifter(x: 0.26, y: 0.30, depth: 0.05, phase: 0.0, speed: 1.00, dir: Direction.right),
+    _Drifter(x: 0.76, y: 0.24, depth: 0.30, phase: 1.9, speed: 0.82, dir: Direction.up),
+    _Drifter(x: 0.52, y: 0.60, depth: 0.00, phase: 3.4, speed: 1.15, dir: Direction.left),
+    _Drifter(x: 0.30, y: 0.76, depth: 0.55, phase: 0.9, speed: 0.70, dir: Direction.down),
+    _Drifter(x: 0.78, y: 0.70, depth: 0.72, phase: 2.6, speed: 0.62, dir: Direction.right),
+    _Drifter(x: 0.60, y: 0.13, depth: 0.85, phase: 4.7, speed: 0.55, dir: Direction.left),
+    _Drifter(x: 0.24, y: 0.52, depth: 0.90, phase: 5.5, speed: 0.48, dir: Direction.up),
   ];
 
   @override
@@ -152,9 +148,7 @@ class _FloatingArrowsState extends State<FloatingArrows>
         // backdrop, and it must never out-shout the Play button.
         child: Opacity(
           opacity: 0.10 + near * 0.45,
-          child: CustomPaint(
-            painter: _DrifterPainter(dir: d.dir, seed: d.seed),
-          ),
+          child: CustomPaint(painter: _DrifterPainter(dir: d.dir)),
         ),
       ),
     );
@@ -162,10 +156,9 @@ class _FloatingArrowsState extends State<FloatingArrows>
 }
 
 class _DrifterPainter extends CustomPainter {
-  const _DrifterPainter({required this.dir, required this.seed});
+  const _DrifterPainter({required this.dir});
 
   final Direction dir;
-  final int seed;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -187,6 +180,5 @@ class _DrifterPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DrifterPainter old) =>
-      old.dir != dir || old.seed != seed;
+  bool shouldRepaint(covariant _DrifterPainter old) => old.dir != dir;
 }

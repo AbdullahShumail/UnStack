@@ -173,26 +173,23 @@ void main() {
   group('Daily generation', () {
     test('the same day always produces the same board', () {
       final day = DateTime(2026, 9, 7);
-      final a = Daily.build(day).bodies;
-      final b = Daily.build(day).bodies;
-      expect(a.length, b.length);
-      for (var i = 0; i < a.length; i++) {
-        expect(a[i].dir, b[i].dir);
-        expect(a[i].cells.length, b[i].cells.length);
-        for (var j = 0; j < a[i].cells.length; j++) {
-          expect(a[i].cells[j].row, b[i].cells[j].row);
-          expect(a[i].cells[j].col, b[i].cells[j].col);
-        }
+      final a = Daily.build(day);
+      final b = Daily.build(day);
+      expect(a.placements.length, b.placements.length);
+      for (var i = 0; i < a.placements.length; i++) {
+        expect(a.placements[i].row, b.placements[i].row);
+        expect(a.placements[i].col, b.placements[i].col);
+        expect(a.placements[i].dir, b.placements[i].dir);
       }
     });
 
     test('different days produce different boards', () {
-      final a = Daily.build(DateTime(2026, 9, 7)).bodies.first;
-      final b = Daily.build(DateTime(2026, 9, 8)).bodies.first;
-      final same = a.head.row == b.head.row &&
-          a.head.col == b.head.col &&
-          a.dir == b.dir;
-      expect(same, isFalse);
+      final a = Daily.build(DateTime(2026, 9, 7));
+      final b = Daily.build(DateTime(2026, 9, 8));
+      final sameStart = a.placements.first.row == b.placements.first.row &&
+          a.placements.first.col == b.placements.first.col &&
+          a.placements.first.dir == b.placements.first.dir;
+      expect(sameStart, isFalse);
     });
 
     test('a week of dailies are all solvable', () {
@@ -200,8 +197,8 @@ void main() {
         final level = Daily.build(DateTime(2026, 9, 1).add(Duration(days: i)));
         final board = level.toBoard();
         for (final step in level.solutionOrder) {
-          expect(board.isLaunchable(step.id), isTrue);
-          board.remove(step.id);
+          expect(board.isLaunchable(step.row, step.col), isTrue);
+          board.pop(step.row, step.col);
         }
         expect(board.isCleared, isTrue);
       }

@@ -1,105 +1,96 @@
 import 'direction.dart';
 
-typedef Cell = ({int row, int col});
-
-/// One arrow: a head, a facing, and the tail lying behind it.
+/// A grid of arrow stacks.
 ///
-/// The tail is not decoration. Every cell of a body occupies the board and
-/// blocks other arrows, so a long tail lying across the grid is an obstacle
-/// that has to be cleared before the lanes it crosses open up.
-class ArrowBody {
-  const ArrowBody({
-    required this.id,
-    required this.dir,
-    required this.cells,
-  });
-
-  final int id;
-  final Direction dir;
-
-  /// Head first, then each cell of the tail behind it.
-  final List<Cell> cells;
-
-  Cell get head => cells.first;
-  int get length => cells.length;
-
-  ArrowBody withId(int newId) =>
-      ArrowBody(id: newId, dir: dir, cells: cells);
-}
-
-/// A grid of arrow bodies.
+/// Each cell holds zero or more arrows. Only the arrow on top of a stack is
+/// visible and only it can be launched; clearing it reveals the one beneath.
 ///
-/// An arrow leaves by travelling from its head toward the edge along its
-/// facing. The launch is legal only if every cell it would pass through is
-/// free — of any arrow's body, not merely of other heads.
+/// An arrow launches by travelling from its own cell toward the edge of the
+/// board along its facing. The launch is legal only if every cell it passes
+/// through is empty — a cell counts as occupied if it holds *any* arrow,
+/// regardless of stack height.
 class Board {
   Board(this.rows, this.cols)
-      : _owner = List<int>.filled(rows * cols, _empty, growable: false),
-        _bodies = {};
+      : _stacks = List.generate(rows * cols, (_) => <Direction>[], growable: false);
 
-  Board._(this.rows, this.cols, this._owner, this._bodies);
-
-  static const int _empty = -1;
+  Board._(this.rows, this.cols, this._stacks);
 
   final int rows;
   final int cols;
 
-  /// Row-major cell ownership: the id of the arrow covering each cell.
-  final List<int> _owner;
-  final Map<int, ArrowBody> _bodies;
+  /// Row-major cell stacks. The last element of a stack is the top arrow.
+  final List<List<Direction>> _stacks;
 
   int _index(int row, int col) => row * cols + col;
 
   bool contains(int row, int col) =>
       row >= 0 && row < rows && col >= 0 && col < cols;
 
-  bool isEmptyAt(int row, int col) => _owner[_index(row, col)] == _empty;
+  List<Direction> stackAt(int row, int col) => _stacks[_index(row, col)];
 
-  /// The arrow covering a cell, or null when the cell is free.
-  ArrowBody? bodyAt(int row, int col) {
-    final id = _owner[_index(row, col)];
-    return id == _empty ? null : _bodies[id];
+  int heightAt(int row, int col) => _stacks[_index(row, col)].length;
+
+  bool isEmptyAt(int row, int col) => _stacks[_index(row, col)].isEmpty;
+
+  /// The visible arrow at [row], [col], or null when the cell is empty.
+  Direction? topAt(int row, int col) {
+    final stack = _stacks[_index(row, col)];
+    return stack.isEmpty ? null : stack.last;
   }
 
-  ArrowBody? bodyById(int id) => _bodies[id];
+  int get arrowCount {
+    var total = 0;
+    for (final stack in _stacks) {
+      total += stack.length;
+    }
+    return total;
+  }
 
-  Iterable<ArrowBody> get bodies => _bodies.values;
+  bool get isCleared => arrowCount == 0;
 
-  int get arrowCount => _bodies.length;
+  void push(int row, int col, Direction dir) =>
+      _stacks[_index(row, col)].add(dir);
 
-  bool get isCleared => _bodies.isEmpty;
+  Direction pop(int row, int col) => _stacks[_index(row, col)].removeLast();
 
-  /// Whether every cell of [body] is currently free.
-  bool canPlace(ArrowBody body) {
-    for (final c in body.cells) {
-      if (!contains(c.row, c.col)) return false;
-      if (!isEmptyAt(c.row, c.col)) return false;
+  /// Whether an arrow sitting at [row], [col] and facing [dir] has an
+  /// unobstructed run to the edge. The starting cell is not part of the path,
+  /// so a tall stack never blocks its own top arrow.
+  bool hasClearPath(int row, int col, Direction dir) {
+    var r = row + dir.dr;
+    var c = col + dir.dc;
+    while (contains(r, c)) {
+      if (!isEmptyAt(r, c)) return false;
+      r += dir.dr;
+      c += dir.dc;
     }
     return true;
   }
 
-  void place(ArrowBody body) {
-    _bodies[body.id] = body;
-    for (final c in body.cells) {
-      _owner[_index(c.row, c.col)] = body.id;
-    }
+  /// Whether the top arrow at [row], [col] can be launched right now.
+  bool isLaunchable(int row, int col) {
+    final dir = topAt(row, col);
+    if (dir == null) return false;
+    return hasClearPath(row, col, dir);
   }
 
-  ArrowBody remove(int id) {
-    final body = _bodies.remove(id)!;
-    for (final c in body.cells) {
-      _owner[_index(c.row, c.col)] = _empty;
+  /// Every cell whose top arrow can currently be launched.
+  List<({int row, int col})> launchableCells() {
+    final result = <({int row, int col})>[];
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        if (isLaunchable(r, c)) result.add((row: r, col: c));
+      }
     }
-    return body;
+    return result;
   }
 
-  /// The cells an arrow at [head] facing [dir] would travel through, ending
-  /// one step past the edge. Used both for the legality check and to animate
-  /// the flight.
-  List<Cell> exitPath(Cell head, Direction dir) {
-    final path = <Cell>[];
-    var r = head.row + dir.dr;
-    var c = head.col + dir.dc;
+  /// The cells an arrow at [row], [col] facing [dir] would travel through,
+  /// ending just off the board. Used to animate the flight.
+  List<({int row, int col})> pathFrom(int row, int col, Direction dir) {
+    final path = <({int row, int col})>[];
+    var r = row + dir.dr;
+    var c = col + dir.dc;
     while (contains(r, c)) {
       path.add((row: r, col: c));
       r += dir.dr;
@@ -109,34 +100,10 @@ class Board {
     return path;
   }
 
-  /// Whether the lane out of [head] along [dir] is clear of every body.
-  ///
-  /// [ignore] lets the generator test a lane before its own arrow is placed.
-  bool hasClearExit(Cell head, Direction dir, {int? ignore}) {
-    var r = head.row + dir.dr;
-    var c = head.col + dir.dc;
-    while (contains(r, c)) {
-      final id = _owner[_index(r, c)];
-      if (id != _empty && id != ignore) return false;
-      r += dir.dr;
-      c += dir.dc;
-    }
-    return true;
-  }
-
-  bool isLaunchable(int id) {
-    final body = _bodies[id];
-    if (body == null) return false;
-    return hasClearExit(body.head, body.dir, ignore: id);
-  }
-
-  List<int> launchableIds() =>
-      [for (final b in _bodies.values) if (isLaunchable(b.id)) b.id];
-
   Board clone() => Board._(
         rows,
         cols,
-        List<int>.of(_owner, growable: false),
-        Map<int, ArrowBody>.of(_bodies),
+        List.generate(rows * cols, (i) => List<Direction>.of(_stacks[i]),
+            growable: false),
       );
 }
