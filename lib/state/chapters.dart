@@ -58,44 +58,44 @@ class Chapters {
   static const List<ChapterSpec> all = [
     ChapterSpec(
       name: 'First Steps',
-      startArrows: 6, endArrows: 14, maxStack: 1,
-      startHardness: 0.05, endHardness: 0.55,
+      startArrows: 10, endArrows: 20, maxStack: 2,
+      startHardness: 0.3, endHardness: 0.65,
       levelCount: 10,
     ),
     ChapterSpec(
       name: 'Stacking Up',
-      startArrows: 16, endArrows: 28, maxStack: 2,
-      startHardness: 0.35, endHardness: 0.7,
+      startArrows: 22, endArrows: 36, maxStack: 3,
+      startHardness: 0.5, endHardness: 0.78,
       levelCount: 20,
     ),
     ChapterSpec(
       name: 'Deep Cuts',
-      startArrows: 30, endArrows: 46, maxStack: 3,
-      startHardness: 0.5, endHardness: 0.82,
+      startArrows: 38, endArrows: 55, maxStack: 4,
+      startHardness: 0.62, endHardness: 0.86,
       levelCount: 25,
     ),
     ChapterSpec(
       name: 'Gridlock',
-      startArrows: 46, endArrows: 66, maxStack: 3,
-      startHardness: 0.62, endHardness: 0.9,
+      startArrows: 55, endArrows: 75, maxStack: 4,
+      startHardness: 0.72, endHardness: 0.92,
       levelCount: 30,
     ),
     ChapterSpec(
       name: 'Tower Block',
-      startArrows: 62, endArrows: 92, maxStack: 4,
-      startHardness: 0.72, endHardness: 0.95,
+      startArrows: 75, endArrows: 100, maxStack: 5,
+      startHardness: 0.8, endHardness: 0.95,
       levelCount: 35,
     ),
     ChapterSpec(
       name: 'The Vault',
-      startArrows: 88, endArrows: 130, maxStack: 5,
-      startHardness: 0.82, endHardness: 1.0,
+      startArrows: 95, endArrows: 135, maxStack: 5,
+      startHardness: 0.88, endHardness: 1.0,
       levelCount: 40,
     ),
     ChapterSpec(
       name: 'Endless',
-      startArrows: 120, endArrows: 170, maxStack: 5,
-      startHardness: 0.9, endHardness: 1.0,
+      startArrows: 125, endArrows: 180, maxStack: 5,
+      startHardness: 0.95, endHardness: 1.0,
       levelCount: 1 << 30,
     ),
   ];
@@ -148,6 +148,24 @@ class Chapters {
     return (spec.startArrows +
             (spec.endArrows - spec.startArrows) * at.t)
         .round();
+  }
+
+  /// How often a surprise timed level turns up.
+  static const int timedEvery = 6;
+
+  /// The first level that may be timed. The opening run stays untimed so the
+  /// rules are learned before the clock is introduced.
+  static const int firstTimedLevel = 5;
+
+  /// Whether the level at [levelIndex] runs against a clock.
+  static bool isTimed(int levelIndex) =>
+      levelIndex >= firstTimedLevel && (levelIndex + 1) % timedEvery == 0;
+
+  /// Seconds allowed on a timed level: enough to solve it at a brisk pace,
+  /// not enough to deliberate over every arrow.
+  static int secondsFor(int levelIndex) {
+    final arrows = arrowsFor(levelIndex);
+    return (arrows * 1.9).round().clamp(25, 240);
   }
 
   /// Builds the level at [levelIndex]. Deterministic: same index, same board.

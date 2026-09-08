@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unstack/state/daily.dart';
 import 'package:unstack/state/progress_store.dart';
+import 'package:unstack/state/sfx.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -9,6 +10,10 @@ void main() {
   late ProgressStore store;
 
   setUp(() async {
+    // No audio plugin exists under flutter_test, and a failed play resolves
+    // after the test that triggered it, which fails whichever test is running
+    // by then. Muting keeps playback from ever reaching the platform channel.
+    Sfx.instance.muted = true;
     SharedPreferences.setMockInitialValues({});
     store = await ProgressStore.load();
   });

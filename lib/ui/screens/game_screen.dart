@@ -5,8 +5,10 @@ import '../../state/level_ref.dart';
 import '../../state/progress_store.dart';
 import '../../theme/palette.dart';
 import '../widgets/board_view.dart';
+import '../widgets/board_backdrop.dart';
 import '../widgets/coin_pill.dart';
 import '../widgets/health_bar.dart';
+import '../widgets/level_clock.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key, required this.store, required this.initial});
@@ -61,6 +63,13 @@ class _GameScreenState extends State<GameScreen> {
               Expanded(
                 child: Stack(
                   children: [
+                    Positioned.fill(
+                      child: BoardBackdrop(
+                        intensity: _game.arrowsTotal == 0
+                            ? 0
+                            : _game.arrowsLeft / _game.arrowsTotal,
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.all(14),
                       child: BoardView(controller: _game),
@@ -101,9 +110,9 @@ class _Hud extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  game.ref.subtitle,
-                  style: const TextStyle(
-                    color: Palette.textDim,
+                  game.isTimed ? 'TIMED CHALLENGE' : game.ref.subtitle,
+                  style: TextStyle(
+                    color: game.isTimed ? Palette.hint : Palette.textDim,
                     fontSize: 10,
                     letterSpacing: 2,
                     fontWeight: FontWeight.w700,
@@ -137,7 +146,14 @@ class _Hud extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              CoinPill(coins: store.coins),
+              if (game.isTimed)
+                LevelClock(
+                  secondsLeft: game.secondsLeft,
+                  secondsTotal: game.secondsTotal,
+                  urgent: game.isUrgent,
+                )
+              else
+                CoinPill(coins: store.coins),
               const SizedBox(height: 7),
               HealthBar(
                 health: game.health,
@@ -348,9 +364,9 @@ class _FailOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return _Sheet(
       children: [
-        const Text(
-          'Out of health',
-          style: TextStyle(
+        Text(
+          game.isTimed && game.secondsLeft <= 0 ? "Time's up" : 'Out of health',
+          style: const TextStyle(
             color: Palette.healthLow,
             fontSize: 32,
             fontWeight: FontWeight.w800,

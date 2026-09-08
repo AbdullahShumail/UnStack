@@ -6,6 +6,7 @@ import '../engine/board.dart';
 import '../engine/direction.dart';
 import '../engine/level.dart';
 import 'level_ref.dart';
+import 'sfx.dart';
 import 'progress_store.dart';
 
 typedef Cell = ({int row, int col});
@@ -71,9 +72,14 @@ class GameController extends ChangeNotifier {
   int _payout = 0;
   bool _disposed = false;
 
+  /// Surprise timed levels run a clock; untimed levels leave it null.
+  Timer? _clock;
+  int _secondsLeft = 0;
+
   @override
   void dispose() {
     _disposed = true;
+    _clock?.cancel();
     super.dispose();
   }
 
@@ -105,6 +111,14 @@ class GameController extends ChangeNotifier {
   int get health => _health;
   bool get failed => _failed;
 
+  bool get isTimed => _ref.timed;
+  int get secondsLeft => _secondsLeft;
+  int get secondsTotal => _ref.seconds;
+
+  /// The last stretch, where the clock starts pressing.
+  static const int urgentSeconds = 5;
+  bool get isUrgent => isTimed && !_won && !_failed && _secondsLeft <= urgentSeconds;
+
   /// Whether the next hint is on the house.
   bool get hintIsFree => _freeHintsLeft > 0;
 
@@ -135,7 +149,39 @@ class GameController extends ChangeNotifier {
     _won = false;
     _failed = false;
     _payout = 0;
+    _startClock();
     _notify();
+  }
+
+  /// Starts, restarts or clears the level clock.
+  ///
+  /// The tick is driven here rather than from the view so the clock keeps
+  /// running while an animation is mid-flight, and so a level that is won or
+  /// failed stops it immediately instead of ticking into a finished board.
+  void _startClock({int? fromSeconds}) {
+    _clock?.cancel();
+    _clock = null;
+    if (!_ref.timed) {
+      _secondsLeft = 0;
+      return;
+    }
+    _secondsLeft = fromSeconds ?? _ref.seconds;
+    _clock = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_disposed || _won || _failed) {
+        timer.cancel();
+        return;
+      }
+      _secondsLeft--;
+      if (_secondsLeft <= 0) {
+        _secondsLeft = 0;
+        _failed = true;
+        timer.cancel();
+        Sfx.instance.blocked();
+      } else {
+        Sfx.instance.tick(urgent: _secondsLeft <= urgentSeconds);
+      }
+      _notify();
+    });
   }
 
   void restart() => load(_ref);
@@ -156,7 +202,11 @@ class GameController extends ChangeNotifier {
     if (blocker != null) {
       _mistakes++;
       if (_health > 0) _health--;
-      if (_health == 0) _failed = true;
+      if (_health == 0) {
+        _failed = true;
+        _clock?.cancel();
+      }
+      Sfx.instance.blocked();
       _notify();
       return LaunchBlocked(from: (row: row, col: col), blocker: blocker);
     }
@@ -167,8 +217,11 @@ class GameController extends ChangeNotifier {
     if (_hinted != null && _hinted!.row == row && _hinted!.col == col) {
       _hinted = null;
     }
+    Sfx.instance.swoosh();
     if (_board.isCleared) {
       _won = true;
+      _clock?.cancel();
+      Sfx.instance.cleared();
       unawaited(_record());
     }
     _notify();
@@ -232,6 +285,15 @@ class GameController extends ChangeNotifier {
     if (!_failed) return;
     _failed = false;
     _health = amount.clamp(1, maxHealth);
+    // A revive on a timed level has to put time back too, or the clock is
+    // already at zero and the player fails again on the next tick.
+    if (_ref.timed) {
+      // A revive on a timed level has to put time back too, or the clock is
+      // already at zero and the player fails again on the next tick.
+      _startClock(
+        fromSeconds: (_ref.seconds * 0.35).round().clamp(10, _ref.seconds),
+      );
+    }
     _notify();
   }
 

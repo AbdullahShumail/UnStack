@@ -16,6 +16,12 @@ sealed class LevelRef {
 
   /// Smaller label above the title.
   String get subtitle;
+
+  /// Whether this level runs against a clock.
+  bool get timed => false;
+
+  /// Seconds allowed, when [timed].
+  int get seconds => 0;
 }
 
 class CampaignRef extends LevelRef {
@@ -31,6 +37,12 @@ class CampaignRef extends LevelRef {
 
   @override
   String get subtitle => Chapters.locate(index).spec.name.toUpperCase();
+
+  @override
+  bool get timed => Chapters.isTimed(index);
+
+  @override
+  int get seconds => Chapters.secondsFor(index);
 
   CampaignRef get next => CampaignRef(index + 1);
 }

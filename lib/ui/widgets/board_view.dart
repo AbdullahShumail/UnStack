@@ -101,7 +101,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           dir: dir,
           controller: AnimationController(
             vsync: this,
-            duration: Duration(milliseconds: math.max(230, 52 * path.length)),
+            // Longer than the travel strictly needs, so the wind-up has room
+            // to be felt before the arrow goes.
+            duration: Duration(milliseconds: math.max(340, 58 * path.length)),
           ),
         );
         setState(() => _flights.add(flight));
@@ -283,17 +285,30 @@ class _BoardPainter extends CustomPainter {
     if (height > 1) _paintDepth(canvas, center, s, height);
   }
 
+  /// Slow, then very fast.
+  ///
+  /// The opening dip draws the arrow back a touch before it goes. That tiny
+  /// pause is what makes the release read as a release rather than a jump —
+  /// without it the motion starts at full speed and looks abrupt.
+  static double _launchCurve(double t) {
+    const windUp = 0.17;
+    if (t < windUp) {
+      return -0.055 * math.sin(t / windUp * math.pi);
+    }
+    return Curves.easeInQuart.transform((t - windUp) / (1 - windUp));
+  }
+
   void _paintFlight(Canvas canvas, _Flight flight) {
     final raw = flight.controller.value;
-    final t = Curves.easeInCubic.transform(raw);
     final path = flight.path;
     final s = geometry.cell * _glyphScale;
 
     // A short trail sells the speed without a particle system.
     for (var i = 2; i >= 0; i--) {
-      final lag = (t - i * 0.06).clamp(0.0, 1.0);
+      final lag = _launchCurve((raw - i * 0.05).clamp(0.0, 1.0));
       final center = _along(path, lag);
-      final fade = (1 - lag * lag) * (i == 0 ? 1.0 : 0.22 / i);
+      final fade =
+          (1 - raw * raw).clamp(0.0, 1.0) * (i == 0 ? 1.0 : 0.22 / i);
       if (fade <= 0.01) continue;
       _paintArrow(
         canvas,
@@ -310,6 +325,8 @@ class _BoardPainter extends CustomPainter {
   Offset _along(List<Cell> path, double t) {
     final pos = t * (path.length - 1);
     final i = pos.floor().clamp(0, path.length - 2);
+    // Deliberately not clamped: a negative fraction extrapolates backwards,
+    // which is how the wind-up pulls the arrow behind its starting cell.
     final frac = pos - i;
     return Offset.lerp(
       geometry.centerOf(path[i].row, path[i].col),
