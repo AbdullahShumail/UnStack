@@ -103,7 +103,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
             vsync: this,
             // Longer than the travel strictly needs, so the wind-up has room
             // to be felt before the arrow goes.
-            duration: Duration(milliseconds: math.max(340, 58 * path.length)),
+            duration: Duration(milliseconds: math.max(620, 118 * path.length)),
           ),
         );
         setState(() => _flights.add(flight));

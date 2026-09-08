@@ -33,27 +33,31 @@ def write(name, samples):
     print("%-14s %6d bytes" % (name, os.path.getsize(path)))
 
 
-def swoosh(duration=0.34, seed=7):
-    """Arrow leaving the board: filtered noise with a rising then falling
-    cutoff, so it reads as something accelerating past the ear."""
+def swoosh(duration=0.42, seed=7):
+    """Arrow leaving the board.
+
+    A tuned downward sweep rather than a noise burst. The earlier version was
+    filtered noise, which came out hissy and abrasive over a phone speaker; a
+    pitched body with only a breath of air behind it reads as movement and
+    stays pleasant when it fires hundreds of times a session.
+    """
     rng = random.Random(seed)
     n = int(RATE * duration)
     out = []
     lp = 0.0
-    bp = 0.0
+    phase = 0.0
     for i in range(n):
         t = i / n
-        # Envelope: quick swell, long tail.
-        env = (t / 0.16) if t < 0.16 else math.exp(-(t - 0.16) * 6.5)
-        # Cutoff sweeps up then back down — the "whoosh" shape.
-        sweep = math.sin(math.pi * t)
-        cutoff = 0.06 + 0.55 * sweep
-        noise = rng.uniform(-1.0, 1.0)
-        lp += cutoff * (noise - lp)
-        # Subtracting a slower follower leaves a band, which sounds like air
-        # rather than static.
-        bp += 0.10 * (lp - bp)
-        out.append((lp - bp) * env)
+        # Soft attack so it never clicks, long gentle tail.
+        env = (1 - math.exp(-t * 45.0)) * math.exp(-t * 4.2)
+        # Sweep down through the vocal range: high enough to cut through,
+        # low enough not to be shrill.
+        freq = 1150.0 * math.exp(-t * 1.5) + 240.0
+        phase += 2 * math.pi * freq / RATE
+        body = math.sin(phase) * 0.62 + math.sin(phase * 2.0) * 0.12
+        # A little filtered air, well under the tone.
+        lp += 0.28 * (rng.uniform(-1.0, 1.0) - lp)
+        out.append((body + lp * 0.16) * env)
     return out
 
 
@@ -70,16 +74,20 @@ def tick(duration=0.045, pitch=1650.0):
     return out
 
 
-def thud(duration=0.16):
-    """Blocked arrow: a low, damped knock."""
+def error(duration=0.26):
+    """Blocked arrow: a soft two-note descending beep.
+
+    Deliberately gentle. A blocked tap is how the game teaches its own rule,
+    so it should read as a correction, not a punishment.
+    """
     n = int(RATE * duration)
-    out = []
-    for i in range(n):
-        t = i / n
-        env = math.exp(-t * 16)
-        # Pitch drops slightly, which is what makes it read as a knock.
-        freq = 190.0 * (1.0 - 0.35 * t)
-        out.append(math.sin(2 * math.pi * freq * (i / RATE)) * env)
+    out = [0.0] * n
+    for k, (freq, start) in enumerate(((620.0, 0.0), (466.0, 0.42))):
+        s0 = int(n * start)
+        for i in range(s0, n):
+            t = (i - s0) / n
+            env = (1 - math.exp(-t * 90.0)) * math.exp(-t * 11.0)
+            out[i] += math.sin(2 * math.pi * freq * ((i - s0) / RATE)) * env * 0.5
     return out
 
 
@@ -100,5 +108,5 @@ if __name__ == "__main__":
     write("swoosh.wav", swoosh())
     write("tick.wav", tick())
     write("tick_urgent.wav", tick(duration=0.06, pitch=2100.0))
-    write("thud.wav", thud())
+    write("error.wav", error())
     write("clear.wav", chime())

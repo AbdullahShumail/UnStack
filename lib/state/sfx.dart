@@ -18,7 +18,7 @@ class Sfx {
   static const _swoosh = 'sfx/swoosh.wav';
   static const _tick = 'sfx/tick.wav';
   static const _tickUrgent = 'sfx/tick_urgent.wav';
-  static const _thud = 'sfx/thud.wav';
+  static const _error = 'sfx/error.wav';
   static const _clear = 'sfx/clear.wav';
 
   final Map<String, AudioPlayer> _players = {};
@@ -27,7 +27,7 @@ class Sfx {
   bool muted = false;
 
   Future<void> warmUp() async {
-    for (final asset in [_swoosh, _tick, _tickUrgent, _thud, _clear]) {
+    for (final asset in [_swoosh, _tick, _tickUrgent, _error, _clear]) {
       await _playerFor(asset);
     }
   }
@@ -60,10 +60,10 @@ class Sfx {
   }
 
   /// An arrow leaving the board.
-  void swoosh() => _play(_swoosh, volume: 0.7);
+  void swoosh() => _play(_swoosh, volume: 0.85);
 
   /// A blocked arrow hitting what is in its way.
-  void blocked() => _play(_thud, volume: 0.8);
+  void blocked() => _play(_error, volume: 0.75);
 
   /// The board cleared.
   void cleared() => _play(_clear, volume: 0.6);

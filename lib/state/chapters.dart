@@ -165,7 +165,7 @@ class Chapters {
   /// not enough to deliberate over every arrow.
   static int secondsFor(int levelIndex) {
     final arrows = arrowsFor(levelIndex);
-    return (arrows * 1.9).round().clamp(25, 240);
+    return (arrows * 1.15).round().clamp(20, 150);
   }
 
   /// Builds the level at [levelIndex]. Deterministic: same index, same board.

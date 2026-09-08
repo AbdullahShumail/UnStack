@@ -122,7 +122,7 @@ class _BackdropPainter extends CustomPainter {
     final t = clock * g.speed + g.phase;
     final near = 1 - g.depth;
 
-    final glyph = size.shortestSide * (0.12 + near * 0.13);
+    final glyph = size.shortestSide * (0.13 + near * 0.15);
     final travel = size.height * (0.012 + near * 0.03);
 
     final centre = Offset(
@@ -132,8 +132,8 @@ class _BackdropPainter extends CustomPainter {
 
     // Blur via the paint's mask rather than an ImageFilter layer: a filtered
     // layer would be re-rasterised every frame for an effect nobody looks at.
-    final blur = 6.0 + g.depth * 12.0;
-    final alpha = (0.022 + near * 0.024) * fade;
+    final blur = 5.0 + g.depth * 11.0;
+    final alpha = (0.06 + near * 0.075) * fade;
 
     canvas.save();
     canvas.translate(centre.dx, centre.dy);
