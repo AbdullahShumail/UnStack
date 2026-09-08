@@ -176,7 +176,7 @@ class _DrifterPainter extends CustomPainter {
     final bounds = Rect.fromCenter(center: Offset.zero, width: s, height: s);
 
     canvas.drawPath(
-      buildRoutedArrowPath(s: s, seed: seed, turns: 3),
+      buildArrowPath(s),
       Paint()
         ..shader = Palette.arrowShader(bounds)
         ..style = PaintingStyle.stroke
