@@ -14,6 +14,7 @@ class Daily {
   static const cols = 6;
   static const maxStack = 3;
   static const arrows = 28;
+  static const mirrors = 2;
 
   /// Middling-hard: beatable in one sitting by a regular, still a real puzzle.
   static const hardness = 0.7;
@@ -38,6 +39,7 @@ class Daily {
       targetArrows: arrows,
       maxStack: maxStack,
       hardness: hardness,
+      mirrors: mirrors,
       seed: 0x5BF03635 ^ (ordinal * 2246822519),
     );
   }

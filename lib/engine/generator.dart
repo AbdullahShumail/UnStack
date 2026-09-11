@@ -29,10 +29,17 @@ class LevelGenerator {
     required int maxStack,
     required double hardness,
     required int seed,
+    int mirrors = 0,
   }) {
     final rng = Random(seed);
     final board = Board(rows, cols);
     final placements = <Placement>[];
+
+    // Mirrors go down first and never move. Every arrow placed afterwards has
+    // its lane checked against the bends, so the reverse-order solution
+    // remains valid: the board an arrow is removed against is exactly the
+    // board it was placed against, mirrors included.
+    final laid = _layMirrors(board, mirrors, rng);
 
     for (var i = 0; i < targetArrows; i++) {
       final candidates = _candidates(board, maxStack, rng);
@@ -46,9 +53,39 @@ class LevelGenerator {
       rows: rows,
       cols: cols,
       placements: placements,
-      profile: profileOf(rows, cols, placements),
+      mirrors: laid,
+      profile: profileOf(rows, cols, placements, mirrors: laid),
       seed: seed,
     );
+  }
+
+  /// Scatters [count] mirrors on cells that leave the board still workable.
+  ///
+  /// Mirrors on the outer ring are avoided: a mirror in a corner can only be
+  /// hit from two sides and mostly just costs a cell, while one in the
+  /// interior can turn lanes coming from all four directions.
+  List<MirrorPlacement> _layMirrors(Board board, int count, Random rng) {
+    final laid = <MirrorPlacement>[];
+    if (count <= 0) return laid;
+
+    final interior = <Cell>[
+      for (var r = 1; r < board.rows - 1; r++)
+        for (var c = 1; c < board.cols - 1; c++) (row: r, col: c),
+    ];
+    final pool = interior.isEmpty
+        ? <Cell>[
+            for (var r = 0; r < board.rows; r++)
+              for (var c = 0; c < board.cols; c++) (row: r, col: c),
+          ]
+        : interior;
+    pool.shuffle(rng);
+
+    for (final cell in pool.take(count)) {
+      final mirror = rng.nextBool() ? Mirror.slash : Mirror.backslash;
+      board.setMirror(cell.row, cell.col, mirror);
+      laid.add((row: cell.row, col: cell.col, mirror: mirror));
+    }
+    return laid;
   }
 
   /// Generates several candidate levels and returns whichever lands closest to
@@ -60,6 +97,7 @@ class LevelGenerator {
     required int maxStack,
     required double hardness,
     required int seed,
+    int mirrors = 0,
     int attempts = 8,
   }) {
     Level? best;
@@ -72,6 +110,7 @@ class LevelGenerator {
         maxStack: maxStack,
         hardness: hardness,
         seed: seed + i * 7919,
+        mirrors: mirrors,
       );
       // A level that came up short on arrows is a poor fit however it feels.
       final shortfall =
@@ -86,22 +125,35 @@ class LevelGenerator {
   }
 
   /// Every legal placement, sampled down to [_sampleSize] for speed.
+  ///
+  /// When the board has mirrors, placements whose lane actually bends are
+  /// reserved half the sample. Left to chance most lanes miss the mirrors,
+  /// and a mirror nobody's lane crosses is nothing but a dead cell.
   List<Placement> _candidates(Board board, int maxStack, Random rng) {
-    final all = <Placement>[];
+    final bent = <Placement>[];
+    final straight = <Placement>[];
     for (var r = 0; r < board.rows; r++) {
       for (var c = 0; c < board.cols; c++) {
+        if (!board.canHoldArrow(r, c)) continue;
         if (board.heightAt(r, c) >= maxStack) continue;
         for (final dir in Direction.values) {
-          if (board.hasClearPath(r, c, dir)) {
-            all.add(Placement(row: r, col: c, dir: dir));
-          }
+          if (!board.hasClearPath(r, c, dir)) continue;
+          final p = Placement(row: r, col: c, dir: dir);
+          (_laneBends(board, p) ? bent : straight).add(p);
         }
       }
     }
-    if (all.length <= _sampleSize) return all;
-    all.shuffle(rng);
-    return all.sublist(0, _sampleSize);
+    if (bent.length + straight.length <= _sampleSize) return [...bent, ...straight];
+
+    bent.shuffle(rng);
+    straight.shuffle(rng);
+    final fromBent = min(bent.length, _sampleSize ~/ 2);
+    final fromStraight = min(straight.length, _sampleSize - fromBent);
+    return [...bent.take(fromBent), ...straight.take(fromStraight)];
   }
+
+  bool _laneBends(Board board, Placement p) =>
+      board.pathFrom(p.row, p.col, p.dir).any((s) => s.dir != p.dir);
 
   /// Picks a placement, biased by [hardness] toward boards that leave the
   /// player fewer legal moves.
@@ -134,9 +186,13 @@ class LevelGenerator {
   static DifficultyProfile profileOf(
     int rows,
     int cols,
-    List<Placement> placements,
-  ) {
+    List<Placement> placements, {
+    List<MirrorPlacement> mirrors = const [],
+  }) {
     final board = Board(rows, cols);
+    for (final m in mirrors) {
+      board.setMirror(m.row, m.col, m.mirror);
+    }
     for (final p in placements) {
       board.push(p.row, p.col, p.dir);
     }

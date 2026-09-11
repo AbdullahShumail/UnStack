@@ -29,3 +29,30 @@ enum Direction {
         Direction.left => Direction.right,
       };
 }
+
+/// A deflector: a static cell that turns an arrow's lane through 90 degrees.
+///
+/// Named for the diagonal it draws. Think of the arrow bouncing off a mirror
+/// laid along that line, with rows growing downward as on screen.
+enum Mirror {
+  /// Bottom-left to top-right. Right turns up, up turns right.
+  slash,
+
+  /// Top-left to bottom-right. Right turns down, down turns right.
+  backslash;
+
+  Direction bend(Direction incoming) => switch (this) {
+        Mirror.slash => switch (incoming) {
+            Direction.right => Direction.up,
+            Direction.up => Direction.right,
+            Direction.left => Direction.down,
+            Direction.down => Direction.left,
+          },
+        Mirror.backslash => switch (incoming) {
+            Direction.right => Direction.down,
+            Direction.down => Direction.right,
+            Direction.left => Direction.up,
+            Direction.up => Direction.left,
+          },
+      };
+}

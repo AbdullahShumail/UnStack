@@ -9,7 +9,6 @@ import 'level_ref.dart';
 import 'sfx.dart';
 import 'progress_store.dart';
 
-typedef Cell = ({int row, int col});
 
 /// Outcome of tapping a cell.
 sealed class LaunchResult {
@@ -23,7 +22,10 @@ class LaunchOk extends LaunchResult {
 
   final Cell from;
   final Direction dir;
-  final List<Cell> path;
+
+  /// Every cell of the lane with the heading on arrival, so a flight through
+  /// a mirror can turn its glyph at the bend.
+  final List<LaneStep> path;
 }
 
 /// The arrow could not leave. [blocker] is the first arrow standing in its way
@@ -198,7 +200,7 @@ class GameController extends ChangeNotifier {
     final dir = _board.topAt(row, col);
     if (dir == null) return const LaunchNothing();
 
-    final blocker = _firstBlocker(row, col, dir);
+    final blocker = _board.firstBlocker(row, col, dir);
     if (blocker != null) {
       _mistakes++;
       if (_health > 0) _health--;
@@ -301,18 +303,6 @@ class GameController extends ChangeNotifier {
     if (_hinted == null) return;
     _hinted = null;
     _notify();
-  }
-
-  /// The first occupied cell in the arrow's lane, or null if the lane is clear.
-  Cell? _firstBlocker(int row, int col, Direction dir) {
-    var r = row + dir.dr;
-    var c = col + dir.dc;
-    while (_board.contains(r, c)) {
-      if (!_board.isEmptyAt(r, c)) return (row: r, col: c);
-      r += dir.dr;
-      c += dir.dc;
-    }
-    return null;
   }
 
   /// The facing of the arrow originally placed at [row], [col] at stack

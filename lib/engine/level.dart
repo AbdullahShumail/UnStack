@@ -1,6 +1,9 @@
 import 'board.dart';
 import 'direction.dart';
 
+/// A mirror fixed to a cell for the life of the level.
+typedef MirrorPlacement = ({int row, int col, Mirror mirror});
+
 /// A single arrow placed on the board.
 class Placement {
   const Placement({required this.row, required this.col, required this.dir});
@@ -78,6 +81,7 @@ class Level {
     required this.placements,
     required this.profile,
     required this.seed,
+    this.mirrors = const [],
   });
 
   final int rows;
@@ -86,6 +90,10 @@ class Level {
 
   /// Arrows in the order the generator laid them down.
   final List<Placement> placements;
+
+  /// Fixed for the whole level. Laid down before any arrow, so every arrow's
+  /// lane was checked against the bends it will actually take.
+  final List<MirrorPlacement> mirrors;
 
   final DifficultyProfile profile;
 
@@ -96,6 +104,9 @@ class Level {
 
   Board toBoard() {
     final board = Board(rows, cols);
+    for (final m in mirrors) {
+      board.setMirror(m.row, m.col, m.mirror);
+    }
     for (final p in placements) {
       board.push(p.row, p.col, p.dir);
     }

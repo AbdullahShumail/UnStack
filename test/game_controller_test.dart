@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unstack/engine/board.dart';
 import 'package:unstack/state/game_controller.dart';
 import 'package:unstack/state/level_ref.dart';
 import 'package:unstack/state/progress_store.dart';

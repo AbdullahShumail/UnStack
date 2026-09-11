@@ -16,7 +16,7 @@ class _Flight {
     required this.controller,
   });
 
-  final List<Cell> path;
+  final List<LaneStep> path;
   final Direction dir;
   final AnimationController controller;
 }
@@ -97,7 +97,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     switch (result) {
       case LaunchOk(:final path, :final dir, :final from):
         final flight = _Flight(
-          path: [from, ...path],
+          path: [(row: from.row, col: from.col, dir: dir), ...path],
           dir: dir,
           controller: AnimationController(
             vsync: this,
@@ -235,6 +235,8 @@ class _BoardPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     for (var r = 0; r < board.rows; r++) {
       for (var c = 0; c < board.cols; c++) {
+        final mirror = board.mirrorAt(r, c);
+        if (mirror != null) _paintMirror(canvas, r, c, mirror);
         final height = board.heightAt(r, c);
         if (height > 0) _paintCell(canvas, r, c, height);
       }
@@ -306,33 +308,80 @@ class _BoardPainter extends CustomPainter {
     // A short trail sells the speed without a particle system.
     for (var i = 2; i >= 0; i--) {
       final lag = _launchCurve((raw - i * 0.05).clamp(0.0, 1.0));
-      final center = _along(path, lag);
+      final at = _along(path, lag);
       final fade =
           (1 - raw * raw).clamp(0.0, 1.0) * (i == 0 ? 1.0 : 0.22 / i);
       if (fade <= 0.01) continue;
       _paintArrow(
         canvas,
-        center,
+        at.centre,
         s * (1 - lag * 0.2),
-        flight.dir,
+        at.dir,
         Palette.arrow,
         fade,
       );
     }
   }
 
-  /// Position along a cell path at normalised progress [t].
-  Offset _along(List<Cell> path, double t) {
+  /// Position and heading along a lane at normalised progress [t].
+  ///
+  /// The heading is that of the segment being crossed, so an arrow passing
+  /// through a mirror turns as it leaves the mirror's cell rather than
+  /// sliding sideways through the bend.
+  ({Offset centre, Direction dir}) _along(List<LaneStep> path, double t) {
     final pos = t * (path.length - 1);
     final i = pos.floor().clamp(0, path.length - 2);
     // Deliberately not clamped: a negative fraction extrapolates backwards,
     // which is how the wind-up pulls the arrow behind its starting cell.
     final frac = pos - i;
-    return Offset.lerp(
-      geometry.centerOf(path[i].row, path[i].col),
-      geometry.centerOf(path[i + 1].row, path[i + 1].col),
-      frac,
-    )!;
+    return (
+      centre: Offset.lerp(
+        geometry.centerOf(path[i].row, path[i].col),
+        geometry.centerOf(path[i + 1].row, path[i + 1].col),
+        frac,
+      )!,
+      // The step at i+1 records the heading used to *reach* it, which is the
+      // heading for the segment from i to i+1.
+      dir: path[i + 1].dir,
+    );
+  }
+
+  /// A mirror: one diagonal stroke across the cell, with a faint square
+  /// behind it so it reads as a fixed thing on the board and not a stray
+  /// line. It is drawn dimmer than arrows because it is never the answer to
+  /// "what do I tap" — only to "where does this lane go".
+  void _paintMirror(Canvas canvas, int row, int col, Mirror mirror) {
+    final centre = geometry.centerOf(row, col);
+    final half = geometry.cell * 0.30;
+    final r = geometry.cell * 0.10;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: centre, width: half * 2.2, height: half * 2.2),
+        Radius.circular(r),
+      ),
+      Paint()
+        ..color = Palette.arrow.withValues(alpha: 0.07)
+        ..style = PaintingStyle.fill,
+    );
+
+    // Slash rises to the right; backslash falls to the right. Rows grow
+    // downward on screen, so "up" is negative y.
+    final from = mirror == Mirror.slash
+        ? centre + Offset(-half, half)
+        : centre + Offset(-half, -half);
+    final to = mirror == Mirror.slash
+        ? centre + Offset(half, -half)
+        : centre + Offset(half, half);
+
+    canvas.drawLine(
+      from,
+      to,
+      Paint()
+        ..color = Palette.arrow.withValues(alpha: 0.72)
+        ..strokeWidth = geometry.cell * 0.075
+        ..strokeCap = StrokeCap.round,
+    );
   }
 
   /// Rings the arrow that stood in the way, so the rule teaches itself.
