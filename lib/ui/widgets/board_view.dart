@@ -346,24 +346,12 @@ class _BoardPainter extends CustomPainter {
     );
   }
 
-  /// A mirror: one diagonal stroke across the cell, with a faint square
-  /// behind it so it reads as a fixed thing on the board and not a stray
-  /// line. It is drawn dimmer than arrows because it is never the answer to
-  /// "what do I tap" — only to "where does this lane go".
+  /// A mirror: one diagonal stroke across the cell, nothing else. It is
+  /// drawn dimmer than arrows because it is never the answer to "what do I
+  /// tap" — only to "where does this lane go".
   void _paintMirror(Canvas canvas, int row, int col, Mirror mirror) {
     final centre = geometry.centerOf(row, col);
     final half = geometry.cell * 0.30;
-    final r = geometry.cell * 0.10;
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: centre, width: half * 2.2, height: half * 2.2),
-        Radius.circular(r),
-      ),
-      Paint()
-        ..color = Palette.arrow.withValues(alpha: 0.07)
-        ..style = PaintingStyle.fill,
-    );
 
     // Slash rises to the right; backslash falls to the right. Rows grow
     // downward on screen, so "up" is negative y.
