@@ -160,6 +160,47 @@ void main() {
     });
   });
 
+  group('Flawless streak', () {
+    test('each clean arrow bumps the streak and the best', () {
+      store.bumpFlawless();
+      store.bumpFlawless();
+      store.bumpFlawless();
+      expect(store.flawless, 3);
+      expect(store.bestFlawless, 3);
+    });
+
+    test('a fault zeroes the streak but keeps the best', () {
+      for (var i = 0; i < 12; i++) {
+        store.bumpFlawless();
+      }
+      store.resetFlawless();
+      expect(store.flawless, 0);
+      expect(store.bestFlawless, 12);
+    });
+
+    test('the best only moves when beaten', () {
+      for (var i = 0; i < 12; i++) {
+        store.bumpFlawless();
+      }
+      store.resetFlawless();
+      for (var i = 0; i < 5; i++) {
+        store.bumpFlawless();
+      }
+      expect(store.flawless, 5);
+      expect(store.bestFlawless, 12);
+    });
+
+    test('the streak survives a relaunch', () async {
+      SharedPreferences.setMockInitialValues({
+        'streak.flawless': 47,
+        'streak.bestFlawless': 133,
+      });
+      final reloaded = await ProgressStore.load();
+      expect(reloaded.flawless, 47);
+      expect(reloaded.bestFlawless, 133);
+    });
+  });
+
   group('Wallet', () {
     test('spending more than the balance is refused', () async {
       final coins = store.coins;

@@ -178,6 +178,7 @@ class GameController extends ChangeNotifier {
         _secondsLeft = 0;
         _failed = true;
         timer.cancel();
+        store.resetFlawless();
         Sfx.instance.blocked();
       } else {
         Sfx.instance.tick(urgent: _secondsLeft <= urgentSeconds);
@@ -203,6 +204,7 @@ class GameController extends ChangeNotifier {
     final blocker = _board.firstBlocker(row, col, dir);
     if (blocker != null) {
       _mistakes++;
+      store.resetFlawless();
       if (_health > 0) _health--;
       if (_health == 0) {
         _failed = true;
@@ -219,6 +221,7 @@ class GameController extends ChangeNotifier {
     if (_hinted != null && _hinted!.row == row && _hinted!.col == col) {
       _hinted = null;
     }
+    store.bumpFlawless();
     Sfx.instance.swoosh();
     if (_board.isCleared) {
       _won = true;

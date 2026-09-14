@@ -277,7 +277,12 @@ class _Stats extends StatelessWidget {
         ),
         _Stat(
           value: '${store.bestStreak}',
-          label: 'BEST STREAK',
+          label: 'DAILY STREAK',
+          icon: Icons.calendar_today_rounded,
+        ),
+        _Stat(
+          value: '${store.bestFlawless}',
+          label: 'FLAWLESS',
           icon: Icons.local_fire_department_rounded,
         ),
       ],

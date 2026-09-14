@@ -9,6 +9,7 @@ import '../widgets/board_backdrop.dart';
 import '../widgets/coin_pill.dart';
 import '../widgets/health_bar.dart';
 import '../widgets/level_clock.dart';
+import '../widgets/streak_badge.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key, required this.store, required this.initial});
@@ -138,6 +139,8 @@ class _Hud extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(width: 14),
+                    StreakBadge(streak: store.flawless, height: 26),
                   ],
                 ),
               ],

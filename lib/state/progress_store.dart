@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -19,6 +20,8 @@ class ProgressStore extends ChangeNotifier {
   static const _kStreak = 'daily.streak';
   static const _kLastDaily = 'daily.last';
   static const _kBestStreak = 'daily.bestStreak';
+  static const _kFlawless = 'streak.flawless';
+  static const _kBestFlawless = 'streak.bestFlawless';
 
   /// What a solve pays, by star rating. Clean solves are worth chasing.
   static const coinsByStars = [0, 10, 20, 30];
@@ -162,6 +165,31 @@ class ProgressStore extends ChangeNotifier {
       await _prefs.setInt(_kStreak, 0);
       notifyListeners();
     }
+  }
+
+  // ---------------------------------------------------------------- flawless
+
+  /// Consecutive arrows launched without a blocked tap, across levels.
+  int get flawless => _prefs.getInt(_kFlawless) ?? 0;
+
+  int get bestFlawless => _prefs.getInt(_kBestFlawless) ?? 0;
+
+  /// One more arrow out clean.
+  ///
+  /// Not awaited on purpose: the preference cache updates synchronously, so
+  /// the new value is readable at once and the counter never lags a tap.
+  void bumpFlawless() {
+    final next = flawless + 1;
+    unawaited(_prefs.setInt(_kFlawless, next));
+    if (next > bestFlawless) unawaited(_prefs.setInt(_kBestFlawless, next));
+    notifyListeners();
+  }
+
+  /// A fault: the streak is over.
+  void resetFlawless() {
+    if (flawless == 0) return;
+    unawaited(_prefs.setInt(_kFlawless, 0));
+    notifyListeners();
   }
 
   // ------------------------------------------------------------------ wallet

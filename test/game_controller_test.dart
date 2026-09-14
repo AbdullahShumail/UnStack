@@ -5,6 +5,7 @@ import 'package:unstack/state/game_controller.dart';
 import 'package:unstack/state/level_ref.dart';
 import 'package:unstack/state/progress_store.dart';
 import 'package:unstack/state/sfx.dart';
+import 'package:unstack/ui/widgets/streak_badge.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -169,6 +170,9 @@ void main() {
       game.dispose();
     });
 
+    Cell launchableCellOf(GameController game) =>
+        game.board.launchableCells().first;
+
     /// A cell whose top arrow is currently blocked, if the level has one.
     Cell? blockedCell(GameController game) {
       final legal =
@@ -268,6 +272,67 @@ void main() {
       expect(game.won, isTrue);
       expect(game.stars, lessThan(3));
       game.dispose();
+    });
+
+    test('a clean launch extends the flawless streak', () {
+      final game = controllerAt(30);
+      expect(store.flawless, 0);
+      final a = launchableCellOf(game);
+      game.launch(a.row, a.col);
+      expect(store.flawless, 1);
+      final b = launchableCellOf(game);
+      game.launch(b.row, b.col);
+      expect(store.flawless, 2);
+      game.dispose();
+    });
+
+    test('a blocked tap ends the flawless streak', () {
+      final game = controllerAt(30);
+      final a = launchableCellOf(game);
+      game.launch(a.row, a.col);
+      expect(store.flawless, 1);
+
+      final blocked = blockedCell(game)!;
+      game.launch(blocked.row, blocked.col);
+      expect(store.flawless, 0);
+      expect(store.bestFlawless, 1);
+      game.dispose();
+    });
+
+    test('restarting a level is not a fault', () {
+      final game = controllerAt(30);
+      final a = launchableCellOf(game);
+      game.launch(a.row, a.col);
+      game.restart();
+      expect(store.flawless, 1, reason: 'restart must not reset the streak');
+      game.dispose();
+    });
+
+    test('the streak carries across levels', () {
+      final game = controllerAt(3);
+      for (final step in game.level.solutionOrder) {
+        game.launch(step.row, step.col);
+      }
+      final after = store.flawless;
+      expect(after, game.arrowsTotal);
+      game.nextLevel();
+      final a = launchableCellOf(game);
+      game.launch(a.row, a.col);
+      expect(store.flawless, after + 1);
+      game.dispose();
+    });
+
+    test('tiers change at 30, 50, 100 and 200', () {
+      expect(StreakTier.of(0), StreakTier.none);
+      expect(StreakTier.of(29), StreakTier.none);
+      expect(StreakTier.of(30), StreakTier.ember);
+      expect(StreakTier.of(49), StreakTier.ember);
+      expect(StreakTier.of(50), StreakTier.red);
+      expect(StreakTier.of(99), StreakTier.red);
+      expect(StreakTier.of(100), StreakTier.purple);
+      expect(StreakTier.of(199), StreakTier.purple);
+      expect(StreakTier.of(200), StreakTier.rainbow);
+      expect(StreakTier.of(5000), StreakTier.rainbow);
     });
 
     test('every chapter boundary builds a playable level', () {
